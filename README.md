@@ -63,3 +63,198 @@
 
 ####  实例的代码实现
 
+ 在 JavaScript 中使用字面量方式创建一个新对象时，实际上没有其他对象与其类似，因为新对象已经不是单例了：
+
+```js
+{ a: 1 } === { a: 1 } 		// false
+```
+
+那么问题来了，如何对构造函数使用 `new` 操作符创建多个对象时，仅获取同一个单例对象呢。 
+
+对于刚刚打经营游戏的例子，我们可以用 JavaScript 来实现一下： 
+
+ ```js
+// 存档类
+function ManageGame() {
+  // 判断是否已经有单例了，无单例赋值
+  ManageGame._schedule = ManageGame._schedule || this;
+  return ManageGame._schedule;
+}
+
+// 获取存档实例
+ManageGame.getInstance = function () {
+  // 判断是否已经有单例了，无单例生成
+  ManageGame._schedule = ManageGame._schedule || new ManageGame();
+  return ManageGame._schedule;
+};
+
+const schedule1 = new ManageGame();
+const schedule2 = ManageGame.getInstance();
+const schedule3 = new ManageGame();
+
+console.log(schedule1 === schedule2, schedule1 === schedule3); // true
+
+ ```
+
+稍微解释一下，这个构造函数在自己身上维护一个实例，第一次执行 `new` 的时候判断这个实例有没有创建过，创建过就直接返回，否则走创建流程。 
+
+ 我们可以用 ES6 的 class 语法改造一下： 
+
+```js
+class ManageGame {
+  static _schedule = null;
+  static getInstance = function () {
+    ManageGame._schedule = ManageGame._schedule || new ManageGame();
+    return ManageGame._schedule;
+  };
+
+  constructor() {
+    ManageGame._schedule = ManageGame._schedule || this;
+    return ManageGame._schedule;
+  }
+}
+
+const schedule1 = new ManageGame();
+const schedule2 = ManageGame.getInstance();
+const schedule3 = new ManageGame();
+
+console.log(schedule1 === schedule2, schedule1 === schedule3); // true
+```
+
+上面方法的缺点在于维护的实例作为静态属性直接暴露，外部可以直接修改。
+
+假如用户将属性值修改，那么单例就会失效。
+
+```js
+ManageGame._schedule = null;
+```
+
+#### 通用实现
+
+仍然是利用 _schedule 来保存单例，主要思想就是将其隐藏，只读或者不向外暴露。
+
+```js
+const ManageGame = (function () {
+  let _schedule = null;
+  let ManageGame = function () {
+    _schedule = _schedule || this;
+    return _schedule;
+  };
+  ManageGame.getInstance = function () {
+    _schedule = _schedule || new ManageGame();
+    return _schedule;
+  };
+  return ManageGame;
+})();
+
+const schedule1 = new ManageGame();
+const schedule2 = ManageGame.getInstance();
+const schedule3 = new ManageGame();
+
+console.log(schedule1 === schedule2, schedule1 === schedule3); // true
+```
+
+#### 惰性单例、懒汉式-饿汉式
+
+有时候一个实例化过程比较耗费性能的类，但是却一直用不到，如果一开始就对这个类进行实例化就显得有些浪费，那么这时我们就可以使用**惰性创建**，即延迟创建该类的单例。之前的例子都属于惰性单例，实例的创建都是 `new` 的时候才进行。 
+
+ 惰性单例又被成为**懒汉式**，相对应的概念是**饿汉式**： 
+
+- 懒汉式单例是在使用时才实例化
+- 饿汉式是当程序启动时或单例模式类一加载的时候就被创建。
+
+```js
+class FuncClass {
+  constructor() {
+    this.bar = "bar";
+  }
+}
+
+// 饿汉式
+const HungrySingleton = (function () {
+  // 运行到此处就初始化
+  const _instance = new FuncClass();
+
+  return function () {
+    return _instance;
+  };
+})();
+
+// 懒汉式
+const LazySingleton = (function () {
+  let _instance = null;
+
+  // 实例化时在初始化 new fn()
+  return function () {
+    return _instance || (_instance = new FuncClass());
+  };
+})();
+
+const visitor1 = new HungrySingleton();
+const visitor2 = new HungrySingleton();
+const visitor3 = new LazySingleton();
+const visitor4 = new LazySingleton();
+
+console.log(visitor1 === visitor2); // true
+console.log(visitor3 === visitor4); // true
+```
+
+#### 源码中的单例模式
+
+以 ElementUI 为例，ElementUI 中的全屏 Loading 蒙层调用有两种形式：
+
+```javascript
+// 1. 指令形式
+Vue.use(Loading.directive)
+// 2. 服务形式
+Vue.prototype.$loading = service
+```
+
+1. 上面的是指令形式注册，使用的方式 `...`；
+2. 下面的是服务形式注册，使用的方式 `this.$loading({ fullscreen: true })`；
+
+用服务方式使用全屏 Loading 是单例的，即在前一个全屏 Loading 关闭前再次调用全屏 Loading，并不会创建一个新的 Loading 实例，而是返回现有全屏 Loading 的实例。
+
+下面我们可以看看 ElementUI 2.9.2 的[源码](https://github.com/ElemeFE/element/blob/v2.9.2/packages/loading/src/index.js)是如何实现的，为了观看方便，省略了部分代码：
+
+```javascript
+import Vue from 'vue'
+import loadingVue from './loading.vue'
+
+const LoadingConstructor = Vue.extend(loadingVue)
+
+let fullscreenLoading
+
+const Loading = (options = {}) => {
+    if (options.fullscreen && fullscreenLoading) {
+        return fullscreenLoading
+    }
+
+    let instance = new LoadingConstructor({
+        el: document.createElement('div'),
+        data: options
+    })
+
+    if (options.fullscreen) {
+        fullscreenLoading = instance
+    }
+    return instance
+}
+
+export default Loading
+```
+
+这里的单例是 `fullscreenLoading`，是存放在闭包中的，如果用户传的 `options` 的 `fullscreen` 为 true 且已经创建了单例的情况下则回直接返回之前创建的单例，如果之前没有创建过，则创建单例并赋值给闭包中的 `fullscreenLoading` 后返回新创建的单例实例。
+
+这是一个典型的单例模式的应用，*通过复用之前创建的全屏蒙层单例，不仅减少了实例化过程，而且避免了蒙层叠加蒙层出现的底色变深的情况。*
+
+#### 优缺点
+
+单例模式主要解决的问题就是**节约资源与保持访问一致性**。 
+
+缺点：单例模式对扩展不友好，一般**不容易扩展**，因为单例模式一般自行实例化，没有接口；
+
+#### 使用场景
+
+1. 当一个类的**实例化过程消耗的资源过多**，可以使用单例模式来避免性能浪费；
+2. 当项目中需要一个公共的状态，那么需要使用单例模式来**保证访问一致性**；
