@@ -36,7 +36,7 @@
 
  不能为了使用设计模式而去做架构，而是有了做架构的需求后，发现它符合某一类设计模式的结构，在将两者结合。 
 
-## 前端常用的七种设计模式
+## 前端常用的设计模式
 
 ### 单例模式
 
@@ -351,3 +351,197 @@ export default class VueRouter {
 2. 处理大量具有相同属性的小对象；
 
 什么时候不该用工厂模式：滥用只是增加了不必要的系统复杂度，过犹不及。
+
+### 发布-订阅模式
+
+在众多设计模式中，可能最常见、最有名的就是发布-订阅模式了。
+
+发布-订阅模式又叫**观察者模式**，它定义了一种**一对多的关系**，让多个订阅者对象**同时监听某一个发布者，或者叫主题对**象，这个主题对象的**状态发生变化时**就会**通知**所有订阅自己的**订阅者对象**，使得它们能够自动更新自己。
+
+当然有人提出发布-订阅模式和观察者模式之间是有一些区别的，但是大部分情况下你可以将他们当成是一个模式，文末会简单讨论一下他们之间的微妙区别，了解即可。
+
+#### 你曾见过的发布发布-订阅模式
+
+比如当我们进入一个聊天室/群，如果有人在聊天室发言，那么这个聊天室里的所有人都会收到这个人的发言。这是一个典型的发布-订阅模式，当我们加入了这个群，相当于订阅了在这个聊天室发送的消息，当有新的消息产生，聊天室会负责将消息发布给所有聊天室的订阅者。
+
+再举个栗子，当我们去买鞋，发现看中的款式已经售罄了，售货员告诉你不久后这个款式会进货，到时候打电话通知你。于是你留了个电话，离开了商场，当下周某个时候鞋店进货了，售货员拿出小本本，给所有关注这个款式的人打电话。
+
+这也是一个日常生活中的一个发布-订阅模式的实例，虽然不知道什么时候进货，但是我们可以登记号码之后等待售货员的电话，*不用每天都打电话问鞋子的信息*。
+
+上面两个小例子，都属于发布-订阅模式的实例，群成员/买家属于消息的订阅者，订阅消息的变化，聊天室/售货员属于消息的发布者，在合适的时机向群成员/小本本上的订阅者发布消息。
+
+在这样的逻辑中，有以下几个特点：
+
+- 买家（订阅者）只要声明对消息的一次订阅，就可以在未来的某个时候接受来自售货员（发布者）的消息，不用一直轮询消息的变化
+- 售货员（发布者）持有一个小本本（订阅者列表），需要在消息发生时挨个去通知小本本上的订阅者，当订阅者增加或减少时，只需要在小本本上增删记录即可；
+
+#### 实例的代码实现
+
+我们可以将鞋店的例子提炼一下，用 JavaScript 来实现：
+
+```js
+const shoesPub = {
+  shoeBook: [], // 售货员的小本本
+  subShoe(phoneNumber) {
+    // 买家在小本本是登记号码
+    this.shoeBook.push(phoneNumber);
+  },
+  notify() {
+    // 售货员打电话通知小本本上的买家
+    for (const customer of this.shoeBook) {
+      customer.update();
+    }
+  },
+};
+
+const customer1 = {
+  phoneNumber: "152xxx",
+  update() {
+    console.log(this.phoneNumber + ": 去商场看看");
+  },
+};
+
+const customer2 = {
+  phoneNumber: "138yyy",
+  update() {
+    console.log(this.phoneNumber + ": 给表弟买双");
+  },
+};
+
+shoesPub.subShoe(customer1); // 顾客登记
+shoesPub.subShoe(customer2); // 顾客登记
+
+// 鞋子来了
+shoesPub.notify(); // 打电话通知买家到货了
+```
+
+这样我们就实现了在有新消息时对买家的通知。
+
+当然还可以对功能进行完善，比如：
+
+- 在登记号码的时候进行一下判重操作，重复号码就不登记了；
+- 买家登记之后想了一下又不感兴趣了，那么以后也就不需要通知了，增加取消订阅的操作；
+
+```js
+const shoesPub = {
+  shoeBook: [], // 售货员的小本本
+  subShoe(phoneNumber) {
+    // 买家在小本本是登记号码
+    // 判重处理
+    if (!this.shoeBook.includes(phoneNumber)) {
+      this.shoeBook.push(phoneNumber);
+    }
+  },
+  // 取消订阅
+  unSubShoe(customer) {
+    if (!this.shoeBook.includes(customer)) return;
+    const idx = this.shoeBook.indexOf(customer);
+    this.shoeBook.splice(idx, 1);
+  },
+  notify() {
+    // 售货员打电话通知小本本上的买家
+    for (const customer of this.shoeBook) {
+      customer.update();
+    }
+  },
+};
+
+const customer1 = {
+  phoneNumber: "152xxx",
+  update() {
+    console.log(this.phoneNumber + ": 去商场看看");
+  },
+};
+
+const customer2 = {
+  phoneNumber: "138yyy",
+  update() {
+    console.log(this.phoneNumber + ": 给表弟买双");
+  },
+};
+
+shoesPub.subShoe(customer1); // 顾客登记
+shoesPub.subShoe(customer1); // 顾客登记
+shoesPub.subShoe(customer2); // 顾客登记
+
+// 顾客取消登记
+shoesPub.unSubShoe(customer1);
+
+// 鞋子来了
+shoesPub.notify(); // 打电话通知买家到货了
+```
+
+到现在我们已经简单完成了一个发布-订阅模式。
+
+但是还可以继续改进，比如买家可以关注不同的鞋型，那么当某个鞋型进货了，只通知关注了这个鞋型的买家，总不能通知所有买家吧。
+
+#### 发布-订阅的通用实现
+
+主要有下面几个概念：
+
+1. **Publisher** ：发布者，当消息发生时负责通知对应订阅者
+2. **Subscriber** ：订阅者，当消息发生时被通知的对象
+3. **SubscriberMap** ：持有不同 type 的数组，存储有所有订阅者的数组
+4. **type** ：消息类型，订阅者可以订阅的不同消息类型
+5. **subscribe** ：该方法为将订阅者添加到 SubscriberMap 中对应的数组中
+6. **unSubscribe** ：该方法为在 SubscriberMap 中删除订阅者
+7. **notify** ：该方法遍历通知 SubscriberMap 中对应 type 的每个订阅者
+
+```js
+const Publisher = (function () {
+  const _subsMap = {}; // 存储订阅者
+  return {
+    // 消息订阅
+    subscribe(type, cb) {
+      if (_subsMap[type]) {
+        if (!_subsMap[type].includes(cb)) {
+          _subsMap[type].push(cb);
+        }
+      } else {
+        _subsMap[type] = [cb];
+      }
+    },
+    // 消息退订
+    unsubscribe(type, cb) {
+      if (!_subsMap[type] || !_subsMap[type].includes(cb)) return;
+      const idx = _subsMap[type].indexOf(cb);
+      _subsMap[type].splice(idx, 1);
+    },
+    // 消息发布
+    notify(type, message) {
+      if (!_subsMap[type]) return;
+      _subsMap[type].forEach((cb) => cb(message));
+    },
+  };
+})();
+
+Publisher.subscribe("运动鞋", (message) => console.log("152xxx" + message)); // 订阅运动鞋
+Publisher.subscribe("运动鞋", (message) => console.log("138yyy" + message));
+Publisher.subscribe("帆布鞋", (message) => console.log("139zzz" + message)); // 订阅帆布鞋
+
+Publisher.notify("运动鞋", " 运动鞋到货了 ~"); // 打电话通知买家运动鞋消息
+Publisher.notify("帆布鞋", " 帆布鞋售罄了 T.T"); // 打电话通知买家帆布鞋消息
+```
+
+#### 源码中的发布-订阅模式
+
+Vue 就是利用发布-订阅模式来实现视图层和数据层的双向绑定。具体的就不展开了~~
+
+#### 发布-订阅模式的优缺点
+
+发布-订阅模式最大的优点就是**解耦**：
+
+1. **时间上的解耦** ：订阅者不用持续关注，当消息发生时发布者会负责通知；
+2. **对象上的解耦** ：发布者不用提前知道消息的接受者是谁，发布者只需要遍历处理所有订阅该消息类型的订阅者发送消息即可
+
+发布-订阅模式也有缺点：
+
+1. **增加消耗** ：创建结构和缓存订阅者这两个过程需要消耗计算和内存资源，即使订阅后始终没有触发，订阅者也会始终存在于内存；
+2. **增加复杂度** ：订阅者被缓存在一起，如果多个订阅者和发布者层层嵌套，那么程序将变得难以追踪和调试，参考一下 Vue 调试的时候你点开原型链时看到的那堆 deps/subs/watchers 们…
+
+#### 其他相关模式
+
+1. **观察者模式** 中的观察者和被观察者之间还存在耦合，被观察者还是知道观察者的；
+2. **发布-订阅模式** 中的发布者和订阅者不需要知道对方的存在，他们通过**消息代理**来进行通信，解耦更加彻底；
+
+### 代理模式
