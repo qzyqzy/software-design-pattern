@@ -258,3 +258,96 @@ export default Loading
 
 1. 当一个类的**实例化过程消耗的资源过多**，可以使用单例模式来避免性能浪费；
 2. 当项目中需要一个公共的状态，那么需要使用单例模式来**保证访问一致性**；
+
+### 工厂模式
+
+根据**不同的输入**返回**不同类的实例**，一般用来创建同一类对象。比如可以获取不同的水果，西瓜，葡萄，哈密瓜等，但是它们都属于水果的。
+
+它的主要思想是将对象的**创建**与对象的**实现分离**
+
+#### 你曾见过的工厂模式
+
+今天你的老同学找你来玩，你决定下个馆子（因为不会做饭），于是你来到了小区门口的饭店，跟老板说，来一份鱼香肉丝，一份宫保鸡丁。等会儿菜就烧好端到你的面前，不用管菜烧出来的过程，你只要负责吃就行了。管他怎么做的，有没有地沟油什么的，只要菜给你上了。
+
+#### 实例的代码实现
+
+我们可以使用 JavaScript 将上面饭馆例子实现一下：
+
+```js
+/* 饭店方法 */
+function restaurant(menu) {
+  switch (menu) {
+    case "鱼香肉丝":
+      return new YuXiangRouSi();
+    case "宫保鸡丁":
+      return new GongBaoJiDin();
+    default:
+      console.log("这个菜本店没有 -。-");
+  }
+}
+
+// 鱼香肉丝类
+function YuXiangRouSi() {
+  this.type = "鱼香肉丝";
+}
+
+// 宫保鸡丁类
+function GongBaoJiDin() {
+  this.type = "宫保鸡丁";
+}
+
+const dish1 = restaurant("鱼香肉丝"); // { type: '鱼香肉丝' }
+const dish2 = restaurant("红烧排骨"); // 这个菜本店没有 -。-
+```
+
+这样就完成了一个工厂模式，但是这个实现有一个问题：
+
+工厂方法中包含了很多与创建产品相关的过程，如果产品种类很多的话，这个工厂方法中就会罗列很多产品的创建逻辑，每次新增或删除产品种类，不仅要增加产品类，还需要对应修改在工厂方法，导致这个工厂方法变得臃肿、高耦合。
+
+严格上这种实现在面向对象语言中叫做**简单工厂模式**。适用于产品种类比较少，创建逻辑不复杂的时候使用。
+
+#### 源码中的工厂模式
+
+Vue-router 源码中的工厂模式：
+
+```js
+// src/index.js
+export default class VueRouter {
+    constructor(options) {
+        this.mode = mode	// 路由模式
+        
+        switch (mode) {           // 简单工厂
+            case 'history':       // history 方式
+                this.history = new HTML5History(this, options.base)
+                break
+            case 'hash':          // hash 方式
+                this.history = new HashHistory(this, options.base, this.fallback)
+                break
+            case 'abstract':      // abstract 方式
+                this.history = new AbstractHistory(this, options.base)
+                break
+            default:
+                // ... 初始化失败报错
+        }
+    }
+}
+```
+
+#### 工厂模式的优缺点
+
+工厂模式将**对象的创建和实现分离**，这带来了优点：
+
+1. 良好的封装，代码结构清晰，**访问者无需知道对象的创建流程**，特别是创建比较复杂的情况下
+
+工厂模式的缺点：
+
+1. 带来了**额外的系统复杂度**，增加了抽象性
+
+#### 使用场景
+
+那么什么时候使用工厂模式呢：
+
+1. 对象的创建比较复杂，而访问者无需知道创建的具体流程；
+2. 处理大量具有相同属性的小对象；
+
+什么时候不该用工厂模式：滥用只是增加了不必要的系统复杂度，过犹不及。
