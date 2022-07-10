@@ -545,3 +545,172 @@ Vue 就是利用发布-订阅模式来实现视图层和数据层的双向绑定
 2. **发布-订阅模式** 中的发布者和订阅者不需要知道对方的存在，他们通过**消息代理**来进行通信，解耦更加彻底；
 
 ### 代理模式
+
+代理模式又称为委托模式，它为目标对象创造了一个代理对象，以控制目标对象的访问。
+
+代理模式把代理对象插入到**访问者**和**目标对象**之间，从而为访问者对目标对象的访问引入一定的间接性。
+
+正是这种间接性，给了代理对象很多操作空间，比如在**调用目标对象前和调用后**进行一些预操作和后操作，从而实现**新的功能或者扩展目标的功能**。
+
+#### 你曾见过的代理模式
+
+明星总是有个助理，或者说经纪人，如果某导演来请这个明星演出，或者某个品牌来找明星做广告，需要经纪人帮明星做接洽工作。而且经纪人也起到过滤的作用，毕竟明星也不是什么电影和广告都会接。类似的场景还有很多，再比如领导和秘书…
+
+在以上的场景中，有以下特点：
+
+1. 导演对明星的访问都是通过经纪人来完成；
+2. 经纪人对访问有过滤的功能；
+
+#### 实例的代码实现
+
+我们使用 JavaScript 来将上面的明星例子实现一下
+
+```js
+// 明星
+var SuperStar = {
+  name: "小鲜肉",
+  playAdvertisement: function (ad) {
+    console.log(ad);
+  },
+};
+
+// 经纪人
+var ProxyAssistant = {
+  name: "经纪人张某",
+  playAdvertisement: function (reward, ad) {
+    if (reward > 1000000) {
+      // 如果报酬超过100w
+      console.log("没问题，我们小鲜鲜最喜欢拍广告了！");
+      SuperStar.playAdvertisement(ad);
+    } else console.log("没空!");
+  },
+};
+
+ProxyAssistant.playAdvertisement(10000, "纯蒸酸牛奶，味道纯纯，尽享纯蒸"); // 没空!
+```
+
+这里我们通过经纪人的方式来和明星取得联系，经纪人会视条件过滤一部分合作请求。
+
+我们可以升级一下，比如如果明星没有档期的话，可以通过经纪人安排档期，当明星有空的时候才让明星来拍广告。
+
+这里通过 `Promise` 的方式来实现档期的安排：
+
+```js
+// 明星
+var SuperStar = {
+  name: "小鲜肉",
+  playAdvertisement: function (ad) {
+    console.log(ad);
+  },
+};
+
+// 经纪人
+var ProxyAssistant = {
+  name: "经纪人张某",
+  scheduleTime() {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        console.log("小鲜鲜有空了");
+        resolve();
+      }, 2000); // 发现明星有空了
+    });
+  },
+  playAdvertisement: function (reward, ad) {
+    if (reward > 1000000) {
+      // 如果报酬超过100w
+      console.log("没问题，我们小鲜鲜最喜欢拍广告了！");
+      ProxyAssistant.scheduleTime() // 安排上了
+        .then(() => SuperStar.playAdvertisement(ad));
+    } else console.log("没空!");
+  },
+};
+
+ProxyAssistant.playAdvertisement(10000, "纯蒸酸牛奶，味道纯纯，尽享纯蒸"); // 没空!
+ProxyAssistant.playAdvertisement(1000001, "纯蒸酸牛奶，味道纯纯，尽享纯蒸");
+
+// 没问题，我们小鲜鲜最喜欢拍广告了！
+
+// 2秒后
+// 小鲜鲜有空了
+// 纯蒸酸牛奶，味道纯纯，尽享纯蒸
+```
+
+这里就简单实现了经纪人对请求的过滤，对明星档期的安排，实现了一个代理对象的基本功能。
+
+#### 代理模式的概念
+
+1. **Target：** 目标对象，也是被代理对象，是具体业务的实际执行者；
+2. **Proxy：** 代理对象，负责引用目标对象，以及对访问的过滤和预处理；
+3. **Visitor：**明星的访问者
+
+ES6 原生提供了 `Proxy` 构造函数，这个构造函数让我们可以很方便地创建代理对象：
+
+```js
+// 明星
+var SuperStar = {
+  name: "小鲜肉",
+  scheduleFlag: false, // 档期标识位，false-没空（默认值），true-有空
+  playAdvertisement: function (ad) {
+    console.log(ad);
+  },
+};
+
+// 经纪人
+var ProxyAssistant = {
+  name: "经纪人张某",
+  scheduleTime(ad) {
+    // 代理明星
+    const schedule = new Proxy(SuperStar, {
+      // 在这里监听 scheduleFlag 值的变化
+      set(obj, prop, val) {
+        if (prop !== "scheduleFlag") return;
+        if (obj.scheduleFlag === false && val === true) {
+          // 小鲜肉现在有空了
+          obj.scheduleFlag = true;
+          obj.playAdvertisement(ad); // 安排上了
+        }
+      },
+    });
+    setTimeout(() => {
+      console.log("小鲜鲜有空了");
+      schedule.scheduleFlag = true; // 明星有空了
+    }, 2000);
+  },
+  playAdvertisement: function (reward, ad) {
+    if (reward > 1000000) {
+      // 如果报酬超过100w
+      console.log("没问题，我们小鲜鲜最喜欢拍广告了！");
+      ProxyAssistant.scheduleTime(ad);
+    } else console.log("没空!");
+  },
+};
+
+ProxyAssistant.playAdvertisement(10000, "纯蒸酸牛奶，味道纯纯，尽享纯蒸"); // 没空!
+ProxyAssistant.playAdvertisement(1000001, "纯蒸酸牛奶，味道纯纯，尽享纯蒸");
+
+// 没问题，我们小鲜鲜最喜欢拍广告了！
+
+// 2秒后
+// 小鲜鲜有空了
+// 纯蒸酸牛奶，味道纯纯，尽享纯蒸
+```
+
+#### 代理模式在实战中的应用
+
+- 拦截器：拦截器的思想在实战中应用非常多，比如我们在项目中经常使用 `Axios` 的实例来进行 HTTP 的请求，使用拦截器 `interceptor` 可以提前对 `request` 请求和 `response` 返回进行一些预处理
+- 前端框架的数据响应式化
+- 缓存代理：将复杂计算的结果缓存起来，下次传参一致时直接返回之前缓存的计算结果
+- 保护代理：当一个对象可能会收到大量请求时，可以设置保护代理，通过一些条件判断对请求进行过滤
+- 虚拟代理：在程序中可以能有一些代价昂贵的操作，此时可以设置虚拟代理。而虚拟代理是为一个开销很大的操作先占位，之后再执行，比如：一个很大的图片加载前，一般使用菊花图、低质量图片等提前占位，优化图片加载导致白屏的情况
+- 正向代理： 一般的访问流程是客户端直接向目标服务器发送请求并获取内容，使用正向代理后，客户端改为向代理服务器发送请求，并指定目标服务器（原始服务器），然后由代理服务器和原始服务器通信，转交请求并获得的内容，再返回给客户端。正向代理隐藏了真实的客户端，为客户端收发请求，使真实客户端对服务器不可见；
+- 反向代理：与一般访问流程相比，使用反向代理后，直接收到请求的服务器是代理服务器，然后将请求转发给内部网络上真正进行处理的服务器，得到的结果返回给客户端。反向代理隐藏了真实的服务器，为服务器收发请求，使真实服务器对客户端不可见。
+
+#### 代理模式的优缺点
+
+代理模式的主要优点有：
+
+1. 代理对象在访问者与目标对象之间可以起到**中介和保护目标对象**的作用；
+2. 代理对象可以**扩展目标对象的功能**；
+3. 代理模式能将访问者与目标对象分离，在一定程度上**降低了系统的耦合度**，如果我们希望适度扩展目标对象的一些功能，通过修改代理对象就可以了
+
+代理模式的缺点主要是增加了系统的复杂度，要斟酌当前场景是不是真的需要引入代理模式（**十八线明星就别请经纪人了**）
